@@ -7,13 +7,35 @@ namespace ThreadPoolExercises.Core
     {
         public static void ExecuteOnThread(Action action, int repeats, CancellationToken token = default, Action<Exception>? errorAction = null)
         {
+
             // * Create a thread and execute there `action` given number of `repeats` - waiting for the execution!
             //   HINT: you may use `Join` to wait until created Thread finishes
             // * In a loop, check whether `token` is not cancelled
             // * If an `action` throws and exception (or token has been cancelled) - `errorAction` should be invoked (if provided)
 
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    for (int i = 0; i < repeats; i++)
+                    {
+                        if (token.IsCancellationRequested)
+                        {
+                            errorAction?.Invoke(new OperationCanceledException("Cancellation requested", token));
+                            break;
+                        }
+                        action();
+                    }
 
+                }
+                catch (Exception e)
+                {
+                    errorAction?.Invoke(e);
+                }
+            });
+            thread.Start();
 
+            thread.Join();
         }
 
         public static void ExecuteOnThreadPool(Action action, int repeats, CancellationToken token = default, Action<Exception>? errorAction = null)
@@ -23,7 +45,34 @@ namespace ThreadPoolExercises.Core
             // * In a loop, check whether `token` is not cancelled
             // * If an `action` throws and exception (or token has been cancelled) - `errorAction` should be invoked (if provided)
 
+            var autoResetEvent = new AutoResetEvent(false);
 
+            ThreadPool.QueueUserWorkItem(callBack =>
+            {
+                try
+                {
+                    for (int i = 0; i < repeats; i++)
+                    {
+                        if (token.IsCancellationRequested)
+                        {
+                            errorAction?.Invoke(new OperationCanceledException("Cancellation requested", token));
+                            break;
+                        }
+                        action();
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    errorAction?.Invoke(e);
+                }
+                finally
+                {
+                    autoResetEvent.Set();
+                }
+            });
+
+            autoResetEvent.WaitOne();
 
         }
     }
